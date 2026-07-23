@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Game</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #000;
+        width: 100%;
+        height: 100%;
+      }
+
+      #container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      canvas#canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: none;
+        touch-action: none; /* stop the browser from treating drags as page gestures */
+      }
+
+      /* ---- Loading overlay ---- */
+      #loading-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #111;
+        z-index: 10;
+        font-family: sans-serif;
+        color: #eee;
+      }
+
+      #loading-bar-track {
+        width: 60%;
+        max-width: 360px;
+        height: 18px;
+        background: #333;
+        border-radius: 9px;
+        overflow: hidden;
+        margin-top: 14px;
+      }
+
+      #loading-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: #4ade80;
+        border-radius: 9px;
+        transition: width 0.15s ease-out;
+      }
+
+      #loading-label {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+      <div id="loading-overlay">
+        <div>Loading...</div>
+        <div id="loading-bar-track">
+          <div id="loading-bar-fill"></div>
+        </div>
+        <div id="loading-label">0%</div>
+      </div>
+    </div>
+
+    <script type='text/javascript'>
+      var canvasElement = document.getElementById('canvas');
+      var loadingOverlay = document.getElementById('loading-overlay');
+      var loadingBarFill = document.getElementById('loading-bar-fill');
+      var loadingLabel   = document.getElementById('loading-label');
+
+      // As a default initial behavior, pop up an alert when webgl context is lost.
+      canvasElement.addEventListener('webglcontextlost', (e) => {
+        alert('WebGL context lost. You will need to reload the page.');
+        e.preventDefault();
+      }, false);
+
+      // ---- Loading bar wiring -------------------------------------------
+      var setStatus = (text) => {
+        if (!setStatus.last) setStatus.last = { time: Date.now(), text: '' };
+        if (text === setStatus.last.text) return;
+        var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+        var now = Date.now();
+        if (m && now - setStatus.last.time < 30) return;
+        setStatus.last.time = now;
+        setStatus.last.text = text;
+
+        if (m) {
+          var current = parseFloat(m[2]);
+          var total   = parseFloat(m[4]);
+          var pct = total > 0 ? (current / total) * 100 : 0;
+          loadingBarFill.style.width = pct + '%';
+          loadingLabel.textContent = Math.round(pct) + '%';
+        } else if (!text) {
+          // Empty status means loading finished
+          loadingOverlay.style.display = 'none';
+        }
+      };
+
+      // ---- Block page scroll / gestures from game input ------------------
+      // Arrow keys, space, and tab can scroll the embedding itch.io page;
+      // capture them at the window level so they never bubble out.
+      var keysToBlock = [
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        ' ', 'Spacebar', 'Tab'
+      ];
+      window.addEventListener('keydown', (e) => {
+        if (keysToBlock.includes(e.key)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      // Prevent touch-scroll/zoom gestures on the canvas itself
+      ['touchstart', 'touchmove', 'touchend'].forEach((evt) => {
+        canvasElement.addEventListener(evt, (e) => {
+          e.preventDefault();
+        }, { passive: false });
+      });
+
+      // Keep keyboard focus on the canvas so it actually receives key events
+      canvasElement.addEventListener('click', () => canvasElement.focus());
+      window.addEventListener('load', () => canvasElement.focus());
+
+      var Module = {
+        canvas: canvasElement,
+        setStatus: setStatus,
+        totalDependencies: 0,
+        monitorRunDependencies(left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : '');
+        }
+      };
+      setStatus('Downloading... (0/1)');
+
+      window.onerror = window.onunhandledrejection = () => {
+        setStatus = (text) => {
+          if (text) console.error('[post-exception status] ' + text);
+        };
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
