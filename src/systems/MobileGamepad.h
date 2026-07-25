@@ -264,8 +264,8 @@ private:
         case Action::Undo:      return flags.undo;
         case Action::Restart:   return flags.restart;
         case Action::Pause:     return flags.pause;
+        default:                return false;
         }
-        return false;
     }
 
     static void SetFlag(PressedFlags& flags, Action action) {
@@ -278,6 +278,7 @@ private:
         case Action::Undo:      flags.undo = true; break;
         case Action::Restart:   flags.restart = true; break;
         case Action::Pause:     flags.pause = true; break;
+		default: 			    break; // ignore unknown actions
         }
     }
 
